@@ -1,0 +1,74 @@
+x-common: &common-setup
+  image: fabook/champ:v0.0.5
+  network_mode: host
+  ipc: host
+  privileged: true
+  volumes:
+    - ${HOME}/.Xauthority:/home/mobile/.Xauthority:rw
+    - .:/home/mobile/ros2_ws/src:rw
+    - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    - /dev/dri:/dev/dri:rw
+  working_dir: /home/mobile/ros2_ws
+
+
+services:
+  terminal:
+    environment:
+    - DISPLAY
+    - QT_X11_NO_MITSHM=1
+    - TELEMETRY_PROTO=udp   # <-- was PROTO=tcp (unused). Use the var your node reads.
+    - TEL_HOST=0.0.0.0      # <-- bind wildcard, receives from host
+    - TEL_PORT=5600
+    image: fabook/champ:pobeda
+    <<: *common-setup
+    stdin_open: true  # dsocker run -i
+    tty: true        # docker run -t
+    command: []
+  
+  terminal-rpi:
+    image: fabook/champ:rpi-v0.0.2
+    <<: *common-setup
+    environment:
+    - DISPLAY=:1
+    - QT_X11_NO_MITSHM=1
+    stdin_open: true  # dsocker run -i
+    tty: true        # docker run -t
+    devices:
+      - "/dev/spidev0.0:/dev/spidev0.0"
+      - "/dev/spidev0.1:/dev/spidev0.1"
+      - "/dev/bus/usb:/dev/bus/usb"
+      - "/dev/video0:/dev/video0"
+    command: [
+      "/bin/bash","-lc","
+      sudo chmod 666 /dev/ttyUSB* 2>/dev/null || true &&
+      sudo chmod 666 /dev/spidev* 2>/dev/null || true &&
+      sudo chmod 666 /dev/ttyACM* 2>/dev/null || true;
+      exec bash"
+      ]
+
+  terminal-itog:
+    image: fabook/champ:rpi-v0.0.2
+    <<: *common-setup
+    environment:
+    - DISPLAY=:1
+    - QT_X11_NO_MITSHM=1
+    stdin_open: true  # dsocker run -i
+    tty: true        # docker run -t
+    devices:
+      - "/dev/spidev0.0:/dev/spidev0.0"
+      - "/dev/spidev0.1:/dev/spidev0.1"
+      - "/dev/bus/usb:/dev/bus/usb"
+      - "/dev/video0:/dev/video0"
+    command: [
+      "/bin/bash","-lc","
+      export ROS_DOMAIN_ID=105 &&
+      sudo chmod 666 /dev/ttyUSB* 2>/dev/null || true &&
+      sudo chmod 666 /dev/spidev* 2>/dev/null || true &&
+      sudo chmod 666 /dev/ttyACM* 2>/dev/null || true &&
+      colcon build &&
+      source install/setup.bash &&
+      ros2 launch a105_bringup itog.launch.py;
+      exec bash"
+      ]
+
+
