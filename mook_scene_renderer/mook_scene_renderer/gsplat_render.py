@@ -332,7 +332,7 @@ class GsplatCinematicNode(Node):
         Ks = K.unsqueeze(0)                # [1, 3, 3]
 
         with torch.no_grad():
-            imgs, _meta = rasterization(
+            render_out = rasterization(
                 means=scene.means,
                 quats=scene.quats,
                 scales=scene.scales,
@@ -344,11 +344,16 @@ class GsplatCinematicNode(Node):
                 height=self.height,
             )
 
-        # imgs: [1, H, W, 3], значения в [0,1]
-        img = imgs[0].detach().cpu().clamp(0.0, 1.0).numpy()  # H x W x 3
-        img_uint8 = (img * 255.0 + 0.5).astype(np.uint8)
-        return img_uint8
+        if isinstance(render_out, (tuple, list)):
+            rgb = render_out[0]
+        else:
+            rgb = render_out
 
+        # imgs: [1, H, W, 3], значения в [0,1]
+        rgb = rgb.clamp(0.0, 1.0)  # на всякий случай
+        rgb_np = (rgb.detach().cpu().numpy() * 255.0).astype("uint8")
+        # если формат (H, W, 3)
+        return rgb_np
     # ---------- Рендер всего видео ----------
 
     def render_video(

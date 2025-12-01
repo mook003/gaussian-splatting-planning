@@ -78,6 +78,12 @@ RUN apt-get update && apt-get upgrade -y && \
 RUN pip install --upgrade pip "numpy<2" \
     && pip install open3d
 
+RUN pip install --upgrade pip "numpy<2" \
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 \
+    pip install ninja jaxtyping rich \
+    pip install gsplat plyfile opencv-python
+
+
 ARG USERNAME=mobile
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID

@@ -76,11 +76,6 @@ RUN pip install \
     open3d \
     "numpy<2" --upgrade
 
-RUN pip install --upgrade pip "numpy<2" \
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 \
-    pip install ninja jaxtyping rich \
-    pip install gsplat
-
 # Clean up
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
