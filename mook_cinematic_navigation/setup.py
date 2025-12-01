@@ -31,6 +31,7 @@ setup(
             'preview_renderer = mook_cinematic_navigation.render_node:main',
             'ply_to_occupancy = mook_cinematic_navigation.ply_to_occupancy_node:main',
             'cinematic_nav2_interactive = mook_cinematic_navigation.cinematic_nav2_interactive:main',
+            'camera_controller = mook_cinematic_navigation.camera_controller:main',
         ],
     },
 )

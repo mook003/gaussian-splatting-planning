@@ -30,6 +30,7 @@ setup(
             'scene_renderer = mook_scene_renderer.scene_renderer_node:main',
             'camera_path_recorder = mook_scene_renderer.camera_path_recorder_node:main',
             'video_recorder = mook_scene_renderer.video_recorder_node:main',
+            'gsplat_render = mook_scene_renderer.gsplat_render:main',
         ],
     },
 )

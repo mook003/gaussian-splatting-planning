@@ -1,0 +1,57 @@
+ply_to_occupancy:
+  ros__parameters:
+    ply_path: "src/data/ConferenceHall.ply"
+    resolution: 0.1
+    min_points_per_cell: 3
+    output_prefix: "maps/conference"
+    map_frame: "map"
+    publish_topic: "scene_map"
+
+    enable_height_filter: true
+    height_min_above_floor: 4.20   # чуть выше пола
+    height_max_above_floor: 5.00   # до ~2 м
+
+    # Попробуй сначала так. Если направление/зеркало не нравится —
+    # поиграйся flip_x/flip_z.
+    flip_x: true
+    flip_y: true
+    flip_z: true
+
+    save_filtered_ply: true
+    filtered_ply_path: "src/data/conference_filtered.ply"
+
+
+scene_renderer:
+  ros__parameters:
+    scene_ply_path: "src/data/ConferenceHall.ply"
+    image_width: 1280
+    image_height: 720
+    horizontal_fov_deg: 70.0
+    camera_frame_id: "camera"
+
+    flip_x: true
+    flip_y: true
+    flip_z: true
+
+camera_path_recorder:
+  ros__parameters:
+    map_frame: "map"
+    camera_frame: "camera"
+    sample_hz: 10.0
+    output_path: "paths/camera_path.json"
+
+gsplat_render:
+  ros__parameters:
+    scene_ply_path: "src/data/ConferenceHall.ply"      # или твой путь к 3DGS
+    camera_path_json: "paths/camera_path.json"         # тот же, что пишет camera_path_recorder
+    output_video_path: "cinematic_output.mp4"
+    image_width: 1280
+    image_height: 720
+    horizontal_fov_deg: 70.0
+    device: "cuda"   # или "cpu"
+    flip_x: true
+    flip_y: true
+    flip_z: true
+    near_plane: 0.01
+    far_plane: 100.0
+    eps2d: 0.3

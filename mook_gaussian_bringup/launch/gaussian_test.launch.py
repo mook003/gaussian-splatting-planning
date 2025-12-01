@@ -20,8 +20,6 @@ def static_tf(name, x,y,z, r,p,yaw, parent, child):
 
 def generate_launch_description():
 
-    map_to_camera = static_tf('nad', 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 'map', 'camera')
-
     map_file = DeclareLaunchArgument(
         "map_file",
         default_value="",
@@ -32,7 +30,7 @@ def generate_launch_description():
         description="Whether run a SLAM",
     )
     rviz_cfg = PathJoinSubstitution([FindPackageShare('mook_gaussian_bringup'), 'rviz', 'common.rviz'])
-    common_cfg = PathJoinSubstitution([FindPackageShare('mook_gaussian_bringup'), 'config', 'renderer.yaml'])
+    common_cfg = PathJoinSubstitution([FindPackageShare('mook_gaussian_bringup'), 'config', 'common.yaml'])
     param_file = DeclareLaunchArgument(
         "params_file",
         default_value=PathJoinSubstitution(
@@ -47,13 +45,6 @@ def generate_launch_description():
         "use_sim_time", default_value="False", description="Use simulation (Gazebo) clock if true"
     )
 
-    path_planner = Node(
-        package= 'mook_cinematic_navigation',
-        executable= 'path_player',
-        name='path_player',
-        #arguments=['-d', ],
-    )
-
     scene_renderer = Node(
         package= 'mook_scene_renderer',
         executable= 'scene_renderer',
@@ -65,6 +56,27 @@ def generate_launch_description():
         package= 'mook_scene_renderer',
         executable= 'video_recorder',
         name='video_recorder',
+        parameters=[common_cfg],
+    )
+
+    gsplat_render = Node(
+        package= 'mook_scene_renderer',
+        executable= 'gsplat_render',
+        name='gsplat_render',
+        parameters=[common_cfg],
+    )
+
+    camera_path_recorder = Node(
+        package= 'mook_scene_renderer',
+        executable= 'camera_path_recorder',
+        name='camera_path_recorder',
+        parameters=[common_cfg],
+    )
+
+    camera_controller = Node(
+        package= 'mook_cinematic_navigation',
+        executable= 'camera_controller',
+        name='camera_controller',
         parameters=[common_cfg],
     )
 
@@ -93,16 +105,17 @@ def generate_launch_description():
 
     ld = LaunchDescription(
         [
-            map_to_camera,
             declare_slam,
             map_file,
             param_file,
             declare_use_sim_time_cmd,
-            #path_planner,
+            camera_controller,
             scene_renderer,
-            video_recorder,
             ply_to_occupancy,
             nav2_bringup,
+            #video_recorder,
+            camera_path_recorder,
+            gsplat_render,
             rviz2,
         ]
     )

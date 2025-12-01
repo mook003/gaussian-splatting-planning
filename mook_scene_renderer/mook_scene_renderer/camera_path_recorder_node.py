@@ -1,90 +1,150 @@
 #!/usr/bin/env python3
+import os
 import json
+from pathlib import Path
+from typing import List, Dict
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import PoseStamped
+from rclpy.duration import Duration
+from rclpy.time import Time
+
+from std_srvs.srv import Trigger
+
+from tf2_ros import Buffer, TransformListener, TransformException
 
 
-class CameraPathRecorderNode(Node):
+class CameraPathRecorder(Node):
+    """
+    Нода:
+      - слушает TF (map -> camera),
+      - с заданной частотой пишет позы в список,
+      - по сервису сохраняет траекторию в JSON.
+    """
+
     def __init__(self):
         super().__init__("camera_path_recorder")
 
-        # Параметры
-        self.declare_parameter("output_path", "camera_path.json")
-        self.declare_parameter("sample_hz", 30.0)
-        self.declare_parameter("image_width", 1280)
-        self.declare_parameter("image_height", 720)
-        self.declare_parameter("horizontal_fov_deg", 70.0)
+        # -------- Параметры --------
+        self.declare_parameter("map_frame", "map")
+        self.declare_parameter("camera_frame", "camera")
+        self.declare_parameter("sample_hz", 10.0)
+        self.declare_parameter("output_path", "paths/camera_path.json")
 
-        self.output_path = str(self.get_parameter("output_path").value)
-        self.sample_hz = float(self.get_parameter("sample_hz").value)
-        self.sample_period = 1.0 / self.sample_hz
+        self.map_frame: str = self.get_parameter("map_frame").value
+        self.camera_frame: str = self.get_parameter("camera_frame").value
+        self.sample_hz: float = float(self.get_parameter("sample_hz").value)
+        self.output_path: Path = Path(self.get_parameter("output_path").value)
 
-        self.image_width = int(self.get_parameter("image_width").value)
-        self.image_height = int(self.get_parameter("image_height").value)
-        self.hfov_deg = float(self.get_parameter("horizontal_fov_deg").value)
-
-        self.frames = []
-        self.start_time = None
-        self.last_sample_time = None
-
-        self.subscription = self.create_subscription(
-            PoseStamped, "camera/pose", self.pose_callback, 10
-        )
+        if self.sample_hz <= 0.0:
+            self.sample_hz = 10.0
 
         self.get_logger().info(
-            f"CameraPathRecorderNode started, writing to {self.output_path}"
+            f"CameraPathRecorder: map_frame={self.map_frame}, "
+            f"camera_frame={self.camera_frame}, sample_hz={self.sample_hz}, "
+            f"output_path={self.output_path}"
         )
 
-    def pose_callback(self, msg: PoseStamped):
-        now = self.get_clock().now()
+        # TF
+        self.tf_buffer = Buffer(cache_time=Duration(seconds=30.0))
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
-        if self.start_time is None:
-            self.start_time = now
-            self.last_sample_time = now
+        # Путь: список поз
+        self.poses: List[Dict] = []
+        self.recording: bool = True
 
-        dt = (now - self.last_sample_time).nanoseconds / 1e9
-        if dt < self.sample_period:
+        # Таймер выборки
+        period = 1.0 / self.sample_hz
+        self.timer = self.create_timer(period, self.timer_cb)
+
+        # Сервисы
+        self.srv_save = self.create_service(
+            Trigger, "save_camera_path", self.handle_save_path
+        )
+        self.srv_reset = self.create_service(
+            Trigger, "reset_camera_path", self.handle_reset_path
+        )
+
+    # -------- Основной цикл --------
+
+    def timer_cb(self):
+        if not self.recording:
             return
 
-        self.last_sample_time = now
-        t = (now - self.start_time).nanoseconds / 1e9
+        try:
+            # Берём "последний доступный" трансформ
+            now = Time()
+            tf = self.tf_buffer.lookup_transform(
+                self.map_frame,
+                self.camera_frame,
+                now,
+                timeout=Duration(seconds=0.1),
+            )
+        except TransformException as ex:
+            self.get_logger().debug(f"TF lookup failed: {ex}")
+            return
 
-        p = msg.pose.position
-        q = msg.pose.orientation
+        tr = tf.transform.translation
+        rot = tf.transform.rotation
+        stamp = tf.header.stamp
 
-        self.frames.append(
-            {
-                "t": t,
-                "position": [p.x, p.y, p.z],
-                "orientation_xyzw": [q.x, q.y, q.z, q.w],
-            }
-        )
+        t_sec = stamp.sec + stamp.nanosec * 1e-9
 
-    def save_json(self):
-        data = {
-            "image_width": self.image_width,
-            "image_height": self.image_height,
-            "horizontal_fov_deg": self.hfov_deg,
-            "frames": self.frames,
+        pose_dict = {
+            "t": t_sec,
+            "frame_id": tf.header.frame_id,
+            "child_frame_id": tf.child_frame_id,
+            "x": tr.x,
+            "y": tr.y,
+            "z": tr.z,
+            "qx": rot.x,
+            "qy": rot.y,
+            "qz": rot.z,
+            "qw": rot.w,
         }
-        with open(self.output_path, "w") as f:
+        self.poses.append(pose_dict)
+
+    # -------- Сервисы --------
+
+    def handle_save_path(self, request, response):
+        if not self.poses:
+            response.success = False
+            response.message = "No poses recorded yet"
+            return response
+
+        self.output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        data = {
+            "map_frame": self.map_frame,
+            "camera_frame": self.camera_frame,
+            "sample_hz": self.sample_hz,
+            "num_poses": len(self.poses),
+            "poses": self.poses,
+        }
+
+        with self.output_path.open("w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
-        self.get_logger().info(
-            f"Saved {len(self.frames)} frames to {self.output_path}"
-        )
+
+        response.success = True
+        response.message = f"Saved {len(self.poses)} poses to {self.output_path}"
+        self.get_logger().info(response.message)
+        return response
+
+    def handle_reset_path(self, request, response):
+        n = len(self.poses)
+        self.poses.clear()
+        response.success = True
+        response.message = f"Cleared in-memory path (removed {n} poses)"
+        self.get_logger().info(response.message)
+        return response
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = CameraPathRecorderNode()
+    node = CameraPathRecorder()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
     finally:
-        node.save_json()
         node.destroy_node()
         rclpy.shutdown()
 
