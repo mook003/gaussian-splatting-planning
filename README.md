@@ -10,6 +10,8 @@ This project runs a full ROS 2 Humble pipeline for:
 
 Everything runs inside a Docker container.
 
+IMPORTNT: add `ConferenceHall.ply` in `data` folder
+
 ### You can check `results/cinematic_output.mp4`
 
 ---
@@ -195,3 +197,4 @@ Now you can play the video on your host with any media player.
   * `DISPLAY` is set on the host and passed to Docker
   * `xhost +local:docker` has been run
   * X11 socket is mounted (`/tmp/.X11-unix`)
+
