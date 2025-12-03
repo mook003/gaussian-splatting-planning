@@ -1,5 +1,13 @@
 # Gaussian Splatting Navigation & Cinematic Renderer (ROS 2 + Docker)
 
+Solved tasks:
+
+- Render a video from inside the scene. (no need to be realistic)
+- Path planning. 
+- Obstacle avoidance.
+- an interactive demo.
+- Real-time preview of the scene or pipeline. 
+
 This project runs a full ROS 2 Humble pipeline for:
 
 - Loading a Gaussian Splatting scene (`.ply`)
@@ -12,7 +20,7 @@ Everything runs inside a Docker container.
 
 IMPORTNT: add `ConferenceHall.ply` in `data` folder
 
-### You can check `results/cinematic_output.mp4`
+### You can check `results/cinematic_output.mp4` and `results/map_interactive_rec.webm`
 
 ---
 
